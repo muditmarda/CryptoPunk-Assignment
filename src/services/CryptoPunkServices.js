@@ -11,10 +11,15 @@ class CryptoPunkService {
 
     async getPunkInfo(punkIndex){
         let res = this.getPunkDetails(punkIndex);
+        if(!res){
+            throw("No punk found for the provided index");
+        }
+        res.punkIndex = punkIndex;
         var fetchedPunkBids = await contract.methods.punkBids(punkIndex).call();
+        var fetchedPunkOffer = await contract.methods.punksOfferedForSale(punkIndex).call();
+        res.isForSale = fetchedPunkOffer.isForSale;
         var highestBidValue = parseInt(fetchedPunkBids.value);
         if (!highestBidValue){
-            var fetchedPunkOffer = await contract.methods.punksOfferedForSale(punkIndex).call()
             res.price = fetchedPunkOffer.minValue + " wei";
         } else {
             res.price =  highestBidValue + " wei";

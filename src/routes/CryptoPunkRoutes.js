@@ -14,11 +14,11 @@ var appRouter = function (app) {
           });
     });
 
-    app.get("/punk-info/", function(req, res) {
-        if(req.query.punkIndex < 1 || req.query.punkIndex > 10000){
+    app.get("/punk-info/:punkIndex", function(req, res) {
+        if(req.params.punkIndex < 1 || req.params.punkIndex > 10000){
             return res.status(400).send({"error":"Invalid punk index, punk index should be in range 1-10000"});
         }
-        cryptoPunkService.getPunkInfo(req.query.punkIndex)
+        cryptoPunkService.getPunkInfo(req.params.punkIndex)
           .then(result => {
             return res.status(200).send({ "punk_info": result });
           })
