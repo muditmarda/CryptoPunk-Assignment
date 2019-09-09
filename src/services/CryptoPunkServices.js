@@ -11,14 +11,13 @@ class CryptoPunkService {
 
     async getPunkInfo(punkIndex){
         let res = this.getPunkDetails(punkIndex);
-        if(!res){
-            throw("No punk found for the provided index");
-        }
         res.punkIndex = punkIndex;
         var fetchedPunkBids = await contract.methods.punkBids(punkIndex).call();
         var fetchedPunkOffer = await contract.methods.punksOfferedForSale(punkIndex).call();
         res.isForSale = fetchedPunkOffer.isForSale;
         var highestBidValue = parseInt(fetchedPunkBids.value);
+        
+        // The punk's price is the highest bid value, or the minimum value specified by seller in case of no bids
         if (!highestBidValue){
             res.price = fetchedPunkOffer.minValue + " wei";
         } else {
@@ -31,12 +30,14 @@ class CryptoPunkService {
         return punksForSale;
     }
     
+    // Gets Punk's details from CryptoPunks.json
     getPunkDetails(punkIndex){
         const punkIndexStr = "" + punkIndex;
         return CryproPunkDetails[punkIndexStr];
     }
     
     async updatePunksForSale(){
+        // Getting all past events about punks offered for sale
         var punksOfferedLogs = await contract.getPastEvents('PunkOffered', {
           fromBlock: Config.STARTBLOCK,
           toBlock: 'latest'
@@ -46,12 +47,15 @@ class CryptoPunkService {
         for(let i = 0; i < punksOfferedLogs.length; i++){
             PunksForSale.add(punksOfferedLogs[i].returnValues.punkIndex)
         }
-    
+
+        // Getting all past events when punks are no longer for sale
         var punksNoLongerForSaleLogs = await contract.getPastEvents('PunkNoLongerForSale', {
             fromBlock: Config.STARTBLOCK,
             toBlock: 'latest'
         });
     
+        // The difference between the punks offered for sale and the punks no longer for sale 
+        // will give the punks currently available for sale 
         for(let i = 0; i < punksNoLongerForSaleLogs.length; i++){
             if(PunksForSale.has(punksNoLongerForSaleLogs[i].returnValues.punkIndex)){
                 PunksForSale.delete(punksNoLongerForSaleLogs[i].returnValues.punkIndex)
@@ -59,11 +63,9 @@ class CryptoPunkService {
         }
     
         var punksForSaleArr = [];
-    
         PunksForSale.forEach(element => {
             punksForSaleArr.push(parseInt(element));
         });
-    
         punksForSale = punksForSaleArr;
     
         if(!hasStarted){
@@ -72,6 +74,13 @@ class CryptoPunkService {
           console.log("################################################");
           hasStarted = true;
         }
+    }
+
+    validatePunkIndex(punkIndex){
+        if(isNaN(punkIndex) || punkIndex < 1 || punkIndex > 9000 || punkIndex%1000 == 0){
+            return false;
+        }
+        return true;
     }
 }
 

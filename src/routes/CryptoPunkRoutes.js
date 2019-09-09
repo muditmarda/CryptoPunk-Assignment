@@ -15,8 +15,10 @@ var appRouter = function (app) {
     });
 
     app.get("/punk-info/:punkIndex", function(req, res) {
-        if(req.params.punkIndex < 1 || req.params.punkIndex > 10000){
-            return res.status(400).send({"error":"Invalid punk index, punk index should be in range 1-10000"});
+        isValidRequest = cryptoPunkService.validatePunkIndex(req.params.punkIndex);
+        if(!isValidRequest){
+          var err = "Invalid punk index: " + req.params.punkIndex;
+          return res.status(400).send({"error" : err});
         }
         cryptoPunkService.getPunkInfo(req.params.punkIndex)
           .then(result => {
