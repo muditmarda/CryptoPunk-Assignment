@@ -10,7 +10,14 @@ var hasStarted = false;
 class CryptoPunkService {
 
     async getPunkInfo(punkIndex){
+        const isValidRequest = this.validatePunkIndex(punkIndex);
+        if(!isValidRequest){
+            throw("Invalid punk index: '" + punkIndex + "'");
+        }
         let res = this.getPunkDetails(punkIndex);
+        if(!res){
+            throw("Invalid punk index: '" + punkIndex + "'");
+        }
         res.punkIndex = punkIndex;
         var fetchedPunkBids = await contract.methods.punkBids(punkIndex).call();
         var fetchedPunkOffer = await contract.methods.punksOfferedForSale(punkIndex).call();
