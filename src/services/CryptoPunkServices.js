@@ -15,24 +15,17 @@ class CryptoPunkService {
             throw("Invalid punk index: '" + punkIndex + "'");
         }
         let res = this.getPunkDetails(punkIndex);
-        if(!res){
-            throw("Invalid punk index: '" + punkIndex + "'");
-        }
         res.punkIndex = punkIndex;
-        var fetchedPunkBids = await contract.methods.punkBids(punkIndex).call();
         var fetchedPunkOffer = await contract.methods.punksOfferedForSale(punkIndex).call();
+        var fetchedPunkBids = await contract.methods.punkBids(punkIndex).call();
+        res.owner = await contract.methods.punkIndexToAddress(punkIndex).call();
         res.isForSale = fetchedPunkOffer.isForSale;
-        var highestBidValue = parseInt(fetchedPunkBids.value);
-        
-        // The punk's price is the highest bid value, or the minimum value specified by seller in case of no bids
-        if (!highestBidValue){
-            res.price = fetchedPunkOffer.minValue + " wei";
-        } else {
-            res.price =  highestBidValue + " wei";
-        }
+        res.forSalePrice = fetchedPunkOffer.minValue + " wei";
+        res.currentBid = fetchedPunkBids.value + " wei";
         return res;
     }
     
+    // returns the global array that maintains the punks available for sale
     async getPunksForSale(){
         return punksForSale;
     }
@@ -40,19 +33,24 @@ class CryptoPunkService {
     // Gets Punk's details from CryptoPunks.json
     getPunkDetails(punkIndex){
         const punkIndexStr = "" + punkIndex;
-        return CryproPunkDetails[punkIndexStr];
+        if(CryproPunkDetails[punkIndexStr]){
+            return CryproPunkDetails[punkIndexStr];
+        }
+        else return {};
     }
     
     async updatePunksForSale(){
+
         // Getting all past events about punks offered for sale
         var punksOfferedLogs = await contract.getPastEvents('PunkOffered', {
           fromBlock: Config.STARTBLOCK,
           toBlock: 'latest'
         });
     
-        var PunksForSale = new Set();
+        // Saving the punks for sale along with the latest block in which they were offered for sale
+        var PunksForSale = new Map();
         for(let i = 0; i < punksOfferedLogs.length; i++){
-            PunksForSale.add(punksOfferedLogs[i].returnValues.punkIndex)
+            PunksForSale.set(punksOfferedLogs[i].returnValues.punkIndex, punksOfferedLogs[i].blockNumber);
         }
 
         // Getting all past events when punks are no longer for sale
@@ -60,19 +58,47 @@ class CryptoPunkService {
             fromBlock: Config.STARTBLOCK,
             toBlock: 'latest'
         });
-    
-        // The difference between the punks offered for sale and the punks no longer for sale 
-        // will give the punks currently available for sale 
+
+        // Getting all past events when punks are bought
+        var punksBoughtLogs = await contract.getPastEvents('PunkBought', {
+            fromBlock: Config.STARTBLOCK,
+            toBlock: 'latest'
+        });
+        
+        /*
+        The difference between the punks offered for sale and 
+        the punks bought after being offered for sale and
+        the punks no longer for sale  after being offered for sale
+        will give the punks currently available for sale 
+        */
+        
+        // Deleting punks no longer for sale after being offered for sale
         for(let i = 0; i < punksNoLongerForSaleLogs.length; i++){
-            if(PunksForSale.has(punksNoLongerForSaleLogs[i].returnValues.punkIndex)){
-                PunksForSale.delete(punksNoLongerForSaleLogs[i].returnValues.punkIndex)
+            if(PunksForSale.has(punksNoLongerForSaleLogs[i].returnValues.punkIndex)
+                && punksNoLongerForSaleLogs[i].blockNumber > 
+                PunksForSale.get(punksNoLongerForSaleLogs[i].returnValues.punkIndex)) {
+
+                    PunksForSale.delete(punksNoLongerForSaleLogs[i].returnValues.punkIndex);
             }
         }
-    
+
+        // Deleting punks bought after being offered for sale
+        for(let i = 0; i < punksBoughtLogs.length; i++){
+            if(PunksForSale.has(punksBoughtLogs[i].returnValues.punkIndex)
+                && punksBoughtLogs[i].blockNumber > 
+                PunksForSale.get(punksBoughtLogs[i].returnValues.punkIndex)) {
+
+                    PunksForSale.delete(punksBoughtLogs[i].returnValues.punkIndex);
+            }
+        }
+
+        // Storing the final punks available for sale in the global array to be sent against the API request
         var punksForSaleArr = [];
-        PunksForSale.forEach(element => {
+        var finalPunksAvailableForSale = PunksForSale.keys();
+        for(var element of finalPunksAvailableForSale){
             punksForSaleArr.push(parseInt(element));
-        });
+        }
+        punksForSaleArr.sort();
         punksForSale = punksForSaleArr;
     
         if(!hasStarted){
@@ -84,7 +110,7 @@ class CryptoPunkService {
     }
 
     validatePunkIndex(punkIndex){
-        if(isNaN(punkIndex) || punkIndex < 1 || punkIndex > 9000 || punkIndex%1000 == 0){
+        if(isNaN(punkIndex) || punkIndex < 1 || punkIndex > 10000){
             return false;
         }
         return true;
